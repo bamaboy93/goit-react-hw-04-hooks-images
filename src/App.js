@@ -1,6 +1,6 @@
 import Searchbar from './components/Searchbar/Searchbar';
 
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import ImageGallery from './components/ImageGallery/ImageGallery';
 import Api from './service/Api';
 import Button from './components/Button/Button';
@@ -8,105 +8,106 @@ import Modal from './components/Modal/Modal';
 import Loader from 'react-loader-spinner';
 
 import 'react-loader-spinner/dist/loader/css/react-spinner-loader.css';
-export default class App extends Component {
-  state = {
-    query: '',
-    page: 1,
-    perPage: 12,
-    pictures: [],
-    currentPictures: '',
-    loader: false,
-    openModal: false,
-  };
-  componentDidUpdate(prevProps, prevState) {
-    const { query, page, pictures } = this.state;
-    if (prevState.query !== query || prevState.page !== page) {
-      this.fetchPictures().then(() => {
-        this.loaderToggle();
-        if (pictures.length > 10) {
-          window.scrollTo({
-            top: document.documentElement.scrollHeight,
-            behavior: 'smooth',
-          });
+
+export default function App() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pictures, setPictures] = useState([]);
+  const [currentPictures, setCurrentPictures] = useState('');
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState(null);
+  const [loader, setLoader] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
+
+ useEffect(() => {
+    if (!searchQuery) return;
+
+    setLoader(false)
+
+    Api
+      .fetchImages(searchQuery, page, error)
+      .then(pictures => {
+        if (pictures.length === 0) {
+          alert("Pictures not found!");
+          
+          return;
         }
+        setPictures(state => {
+          return [...state, ...pictures];
+        });
+        
+      })
+      .catch(error => {
+        setError(error);
+        
+      })
+      
+      .finally(data => {
+        window.scrollTo({
+          top: document.documentElement.scrollHeight - 995,
+          behavior: 'smooth',
+        });
       });
-    }
-  }
-
-  OnLoadMore = () => {
-    this.setState(prev => ({
-      page: prev.page + 1,
-    }));
-  };
-
-  onImgClick = e => {
-    if (e.target.nodeName !== 'IMG') {
+   
+  }, [searchQuery, page, error]);
+  
+  const onFormSubmit = query => {
+    if (query === searchQuery) {
       return;
     }
-    this.setState({
-      currentPictures: e.target.dataset.img,
-    });
-    this.toggleModal();
+      
+
+    setSearchQuery(query);
+    setPictures([]);
+    setPage(1);
+    setError(null);
+    setLoader(true);
   };
 
-  loaderToggle = () => {
-    this.setState(prev => ({
-      loader: !prev.loader,
-    }));
+  const onLoadMore = () => {
+    setLoader(true);
+    setPage(prevPage => prevPage + 1);
+    scrollPage();
   };
 
-  fetchPictures = () => {
-    const { query, page, perPage } = this.state;
-
-    this.loaderToggle();
-    const options = {
-      query: query,
-      page: page,
-      perPage: perPage,
-    };
-    return Api.getImages(options).then(hits => {
-      this.setState(prev => ({
-        pictures: [...prev.pictures, ...hits],
-      }));
-    });
+  const onImgClick = e => {
+    setCurrentPictures(e.target.dataset.img);
+    toggleModal();
   };
 
-  onSubmit = searchQuery => {
-    this.setState({
-      query: searchQuery,
-      page: 1,
-      pictures: [],
-    });
+  const toggleModal = () => {
+    setOpenModal(!openModal);
   };
-  toggleModal = () => {
-    this.setState(prev => ({
-      openModal: !prev.openModal,
-    }));
+
+   const scrollPage = () => {
+    setTimeout(() => {
+      window.scrollBy({
+        top: document.documentElement.clientHeight - 160,
+        behavior: 'smooth',
+      });
+    }, 800);
   };
-  render() {
-    const { pictures, query, loader, openModal, currentPictures } = this.state;
-    return (
+
+  return (
       <div className="App">
         {loader && (
           <Modal>
             <Loader type="Rings" color="#00BFFF" height={700} width={700} />
           </Modal>
         )}
-        <Searchbar value={query} onFormSubmit={this.onSubmit} />
-        <ImageGallery pictures={pictures} onImgClick={this.onImgClick} />
+        <Searchbar value={searchQuery} onSubmit={onFormSubmit} />
+        <ImageGallery pictures={pictures} onImgClick={onImgClick} />
         {pictures.length > 0 && (
           <Button
-            onBtnClick={this.OnLoadMore}
+            onBtnClick={onLoadMore}
             text={loader ? 'Loading' : 'Load More'}
           />
         )}
 
         {openModal && (
-          <Modal onCloseModal={this.toggleModal}>
+          <Modal onCloseModal={toggleModal}>
             <img src={currentPictures} alt="Dont Worry Be Happy" />
           </Modal>
         )}
       </div>
     );
-  }
 }
